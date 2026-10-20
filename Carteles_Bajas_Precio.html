@@ -1,6 +1,4 @@
-<!doctype html><html><head><meta charset="utf-8">
-<link rel="manifest" href="manifest.json"><meta name="theme-color" content="#e1251b"><link rel="icon" href="icon-192.png"><link rel="apple-touch-icon" href="icon-192.png">
-<script>if("serviceWorker" in navigator&&location.protocol==="https:"){addEventListener("load",function(){navigator.serviceWorker.register("sw.js")})}</script><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#faf9f5;color:#141413}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<!doctype html><html><head><meta charset="utf-8"><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#faf9f5;color:#141413}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
 <title>Bajas de precio · Carga automática</title>
 <style>
   :root{
@@ -456,7 +454,7 @@
       </div>
     </div>
     <div class="topbar-actions">
-      <a class="btn" href="index.html" style="text-decoration:none">← Inicio</a>
+      <a class="btn" href="Inicio_Carteleria.html" style="text-decoration:none">← Inicio</a>
       <span class="count-pill"><b id="stat-productos">0</b> productos · <b id="stat-hojas">0</b> hojas</span>
       <button class="btn" id="btn-vaciar" type="button">Vaciar todo</button>
       <button class="btn btn-primary" id="btn-exportar" type="button">
@@ -1842,7 +1840,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
 (function(){
 var C={"title": "Bajas de precio", "sub": "Carga automática · Excel del día, catálogo o foto · 4 por hoja", "cnt": ".count-pill", "hide": [".topbar"], "btns": [["#btn-agregar", "+ Nuevo cartel"], ["#btn-vaciar", "Vaciar"], ["#btn-exportar", "Imprimir / PDF", 1]]};
 var bar=document.createElement("div");bar.className="pnr-bar";
-bar.innerHTML='<a class="pnr-btn pnr-home" href="index.html">\u2190 Inicio</a><div class="pnr-t"><b></b><small></small></div><div class="pnr-sp"></div><span class="pnr-cnt"></span><div class="pnr-act"></div>';
+bar.innerHTML='<a class="pnr-btn pnr-home" href="Inicio_Carteleria.html">\u2190 Inicio</a><div class="pnr-t"><b></b><small></small></div><div class="pnr-sp"></div><span class="pnr-cnt"></span><div class="pnr-act"></div>';
 bar.querySelector(".pnr-t b").textContent=C.title;bar.querySelector(".pnr-t small").textContent=C.sub;
 var act=bar.querySelector(".pnr-act");
 function mover(sel,label,pri){var e=document.querySelector(sel);if(!e)return;e.className="pnr-btn"+(pri?" pri":"");e.removeAttribute("style");if(label)e.textContent=label;act.appendChild(e)}
@@ -2329,6 +2327,68 @@ async function porCeldas(w,c,prog){
     if(!r.desc&&!r.tmp)continue;
     r.dud=!(+r.tmp>0)||!/^\d{2}-\d{2}-\d{4}$/.test(r.desde);out.push(r)}
   return out}
+/* ---- fleje de góndola: descripción, precio grande, precio x KG/LT y código de barras ---- */
+function escala(file,ancho){return new Promise(function(ok,no){var im=new Image();im.onload=function(){
+  var k=ancho/im.width,c=document.createElement("canvas");c.width=Math.round(im.width*k);c.height=Math.round(im.height*k);
+  var x=c.getContext("2d");x.imageSmoothingQuality="high";x.drawImage(im,0,0,c.width,c.height);
+  var d=x.getImageData(0,0,c.width,c.height),p=d.data;for(var i=0;i<p.length;i+=4){var g=.299*p[i]+.587*p[i+1]+.114*p[i+2];p[i]=p[i+1]=p[i+2]=g}
+  x.putImageData(d,0,0);ok(c)};im.onerror=no;im.src=imgURL})}
+function leerFleje(txt){
+  var L=txt.split(/\n/).map(function(l){return l.replace(/[|¦]/g," ").replace(/\s+/g," ").trim()}).filter(Boolean),pi=-1,pl=-1,precio=0,ppum=0,uni="",ean="";
+  L.forEach(function(l,i){var U=l.toUpperCase();
+    var mp=U.match(/P[RA]E[CG]I?O\s*X?\s*(KG|KILO|LT|LITRO|L|UN|UNIDAD|G)?[^\d]*(\d{1,3}[.,]?\d{3})/);
+    if(mp){ppum=+mp[2].replace(/[^\d]/g,"");uni=mp[1]||"";if(pl<0)pl=i;return}
+    var me=U.replace(/\s/g,"").match(/7\d{12}/);if(me&&!ean)ean=me[0];
+    var m=U.match(/[$S]\s?(\d{1,3}(?:[.,]\d{3})+|\d{3,6})(?!\d)/)||U.match(/^\W*(\d{1,3}[.,]\d{3})\W*$/);
+    if(m&&pi<0&&!/PRECIO/.test(U)){precio=+m[1].replace(/[^\d]/g,"");pi=i}});
+  // descripción: líneas con letras justo arriba del precio
+  var desc=[],tope=pi>=0?pi:(pl>=0?pl:L.length);
+  for(var i=tope-1;i>=0&&desc.length<3;i--){var t=L[i].toUpperCase().replace(/^(?:\S{1,2}\s+)+(?=[A-ZÑÁÉÍÓÚ]{3})/,"").replace(/^[^A-Z0-9ÑÁÉÍÓÚ]+/,"").replace(/[^A-Z0-9ÑÁÉÍÓÚ\/.,%&\- ]/g,"").trim();
+    var letras=(t.match(/[A-ZÑÁÉÍÓÚ]/g)||[]).length;if(t.length>=4&&letras/t.length>.5)desc.unshift(t);else if(desc.length)break}
+  var d=desc.join(" ").replace(/\s+/g," ").trim();
+  d=d.replace(/\b([0-9OSIl]{2,4})(GRS?|G|KG|ML|CC|LTS?|L|UN)\b/g,function(m0,n,u){return /[0-9O]/.test(n)?n.replace(/O/g,"0").replace(/S/g,"5").replace(/[Il]/g,"1")+u:m0});
+  // control: precio = precio x KG/LT × contenido del envase
+  var mm=d.match(/(\d+(?:[.,]\d+)?)\s*(GRS?|G|KG|ML|CC|LTS?|L)\b/),cont=0;
+  if(mm){var q=+mm[1].replace(",",".");cont=/^G/.test(mm[2])||mm[2]==="ML"||mm[2]==="CC"?q/1000:q}
+  var esperado=ppum&&cont?Math.round(ppum*cont):0,dud=false;
+  if(esperado&&(!precio||Math.abs(precio-esperado)>Math.max(20,esperado*.02))){precio=esperado;dud=true}
+  if(!d||!precio)return null;
+  return {ok:true,desc:d,tipo:"PRECIO",comb:"",tmp:String(precio),tc:"",desde:"",hasta:"",dud:dud,ean:ean}}
+async function porFleje(w,file,prog){
+  var wk=w.num||w,best=null,raw="";
+  await wk.setParameters({tessedit_pageseg_mode:"6",tessedit_char_whitelist:""});
+  for(var ancho of [600,480,800,400,1000]){var c=await escala(file,ancho);var r=await wk.recognize(c);raw=r.data.text;prog("recognizing text",.5);
+    var f=leerFleje(raw);if(f&&!f.dud){best=f;break}if(f&&!best)best=f}
+  return {fila:best,raw:raw}}
+/* ---- tabla sin grilla (presentaciones / PDF del catálogo): una fila por línea con fechas ---- */
+function leerTabla(txt){var out=[];
+  txt.split(/\n/).forEach(function(l){
+    var U=l.toUpperCase().replace(/[~—_=|«»]+/g," ").replace(/\s+/g," ").trim(),re=/(\d{1,2})\s?[\/\-.]\s?(\d{1,2})\s?[\/\-.]\s?(\d{4})/g,m,f=[],i0=-1;
+    while(m=re.exec(U)){if(i0<0)i0=m.index;f.push(("0"+m[1]).slice(-2)+"-"+("0"+m[2]).slice(-2)+"-"+m[3])}
+    if(!f.length)return;var pre=U.slice(0,i0).trim(),tr=/\b(PRECIO|DESCTO|DESCUENTO|DCTO|PACK)\b/g,t,last=null;
+    while(t=tr.exec(pre))last=t;if(!last)return;
+    var antes=pre.slice(0,last.index).trim(),desp=pre.slice(last.index+last[0].length).trim();
+    var tipo=last[1]==="PACK"?"PACK":/DESC|DCTO/.test(last[1])?"DESCTO":"PRECIO",comb="",tmp="";
+    desp.split(" ").forEach(function(w){if(/^\d+X\d*$/.test(w)&&!comb)comb=w;else if(!tmp&&/\d/.test(w))tmp=w.replace(/[^\d%]/g,"")});
+    tmp=tmp.replace("%","");if(tipo==="DESCTO"&&+tmp>100)tmp=tmp.slice(0,2);
+    var ref="",mr=antes.match(/\s(\d{1,3}[.,]\d{3}|\d{4,6})$/);if(mr){ref=mr[1].replace(/[^\d]/g,"");antes=antes.slice(0,mr.index).trim()}
+    var n="",mn=antes.match(/^(\d{1,3})\s+/);if(mn){n=mn[1];antes=antes.slice(mn[0].length)}
+    var nombre=antes,descr="",ms=antes.match(/\s(\d{6,8})\s/);if(ms){nombre=antes.slice(0,ms.index);descr=antes.slice(ms.index+ms[0].length)}
+    nombre=nombre.replace(/\$?\s?\d{1,3}[.,]\d{3}\s*TMP\b.*$/,"").replace(/\d+\s?%\s*(DE\s*)?(DESCTO|DCTO|DESCUENTO).*$/,"").replace(/\bTMP\b.*$/,"").replace(/[^A-Z0-9ÑÁÉÍÓÚ´'&.\/%)]+$/,"").trim();
+    descr=descr.replace(/\s+V\d\s*$/,"").replace(/[^A-Z0-9ÑÁÉÍÓÚ´'&.\/%)]+$/,"").trim(); // se quita la versión interna (V2)
+    if(descr.length>=4)nombre=descr; // el cartel lleva la DESCRIPCIÓN del producto
+    if(nombre.length<4||!tmp)return;
+    out.push({n:n,desc:nombre,tipo:tipo,comb:comb,tmp:tmp,tc:"",ref:ref,sap:ms?ms[1]:"",desde:f[0]||"",hasta:f[1]||""})});
+  if(out.length<2)return null;
+  // un cartel por producto (fila); el precio de referencia no se usa
+  return out.map(function(r){return {ok:true,desc:r.desc,tipo:r.tipo,comb:r.comb,tmp:r.tmp,tc:"",desde:r.desde,hasta:r.hasta,dud:!(+r.tmp>0)}})}
+async function porTexto(w,file){ // lectura completa con el modelo en inglés, ampliada para letra chica
+  var wk=w.num||w;await wk.setParameters({tessedit_pageseg_mode:"6",tessedit_char_whitelist:""});
+  var im=await new Promise(function(ok,no){var i=new Image();i.onload=function(){ok(i)};i.onerror=no;i.src=imgURL});
+  var k=Math.max(1,Math.min(3,3000/im.width)),c=document.createElement("canvas");c.width=Math.round(im.width*k);c.height=Math.round(im.height*k);
+  var x=c.getContext("2d");x.imageSmoothingQuality="high";x.drawImage(im,0,0,c.width,c.height);
+  var d=x.getImageData(0,0,c.width,c.height),p=d.data;for(var j=0;j<p.length;j+=4){var gg=.299*p[j]+.587*p[j+1]+.114*p[j+2];p[j]=p[j+1]=p[j+2]=gg}x.putImageData(d,0,0);
+  return (await wk.recognize(c)).data.text}
 /* ---- interpretación de cada línea del catálogo ---- */
 function numFix(t){return t.replace(/[Oo]/g,"0").replace(/[lI|]/g,"1").replace(/[Ss]/g,"5").replace(/B/g,"8")}
 function leerLineas(txt){var out=[];
@@ -2356,9 +2416,9 @@ function leerLineas(txt){var out=[];
 function pinta(raw){
   var h='<img class="ocr-img" src="'+imgURL+'" alt="Foto cargada">';
   if(!filas.length){h+='<p><b>No encontré filas de catálogo en la foto.</b> Prueba con una captura más nítida, sin cortar las columnas TMP y fechas.</p>'}
-  else{h+='<table class="ocr-t"><thead><tr><th></th><th>Nombre genérico promoción</th><th style="width:96px">Tipo</th><th style="width:66px">Comb.</th><th style="width:86px">TMP</th><th style="width:80px">TC</th><th style="width:106px">Inicio</th><th style="width:106px">Término</th></tr></thead><tbody>'+
+  else{h+='<table class="ocr-t"><thead><tr><th></th><th>Descripción</th><th style="width:96px">Tipo</th><th style="width:66px">Comb.</th><th style="width:86px">TMP</th><th style="width:80px">TC</th><th style="width:106px">Inicio</th><th style="width:106px">Término</th></tr></thead><tbody>'+
     filas.map(function(f,i){return '<tr data-i="'+i+'"'+(f.ok?'':' class="off"')+'><td><input type="checkbox" data-k="ok"'+(f.ok?' checked':'')+' style="width:auto"></td>'+
-      '<td class="d"><input data-k="desc" value="'+esc(f.desc)+'"></td>'+
+      '<td class="d"><input data-k="desc" value="'+esc(f.desc)+'">'+(f.nota?'<div style="font-size:11px;color:#6d6a64;margin-top:2px">Promo de '+esc(f.nota)+'</div>':'')+'</td>'+
       '<td><select data-k="tipo">'+["PRECIO","PACK","DESCTO"].map(function(t){return '<option'+(t===f.tipo?' selected':'')+'>'+t+'</option>'}).join("")+'</select></td>'+
       '<td><input data-k="comb" value="'+esc(f.comb)+'" placeholder="2X"></td>'+
       '<td><input data-k="tmp" value="'+esc(f.tmp)+'"'+(+f.tmp>0?'':' class="dud"')+'></td>'+
@@ -2383,19 +2443,21 @@ async function procesar(file){
   $("ocr-bd").innerHTML='<img class="ocr-img" src="'+imgURL+'" alt=""><b id="ocr-st">Preparando lector…</b><div class="ocr-prog"><i id="ocr-bar"></i></div><div class="ocr-note">La primera vez tarda unos segundos en encender el lector. Todo se procesa en este equipo, sin internet.</div>';
   var ET={"loading tesseract core":"Encendiendo lector…","initializing tesseract":"Encendiendo lector…","loading language traineddata":"Cargando español…","initializing api":"Encendiendo lector…","recognizing text":"Leyendo la foto…"};
   function prog(s,p){var st=$("ocr-st"),b=$("ocr-bar");if(st)st.textContent=ET[s]||"Procesando…";if(b)b.style.width=Math.round(p*100)+"%"}
-  try{var w=await motor(prog);prog("recognizing text",0);var L=await lienzo(file),txt="";
+  try{var w=await motor(prog);prog("recognizing text",0);var L=await lienzo(file),txt="",fl,tb;
     var pc=await porCeldas(w,L.c,prog);
     if(pc&&pc.length){filas=pc;txt=pc.map(function(f){return [f.desc,f.tipo,f.comb,f.tmp,f.tc,f.desde,f.hasta].join(" | ")}).join("\n")}
-    else{await w.setParameters({tessedit_pageseg_mode:"6",tessedit_char_whitelist:""});var c=await preparar(file);var r=await w.recognize(c);txt=r.data.text;filas=leerLineas(txt)}
+    else if((txt=await porTexto(w,file))&&(tb=leerTabla(txt))){filas=tb}
+    else if((fl=await porFleje(w,file,prog)).fila){filas=[fl.fila];txt=fl.raw}
+    else{txt=txt||await porTexto(w,file);filas=leerLineas(txt);if(!filas.length){await w.setParameters({tessedit_pageseg_mode:"6",tessedit_char_whitelist:""});var c=await preparar(file);var r=await w.recognize(c);txt=r.data.text;filas=leerLineas(txt)}}
     pinta(txt)}
   catch(err){$("ocr-bd").innerHTML='<p><b>No se pudo leer la foto.</b></p><div class="ocr-raw">'+esc(err&&err.message||err)+'</div>'}
 }
 
 /* ---- crear carteles: arma un catálogo y lo pasa por la carga normal de Excel ---- */
 $("ocr-ok").onclick=function(){
-  var rows=[["N PROMOCION","NOMBRE GENERICO PROMOCION","SAP","TIPO PROMO","COMBINACION","TMP","TC","FECHA INICIO","FECHA FINAL"]],n=0;
+  var rows=[["N PROMOCION","NOMBRE GENERICO PROMOCION","SAP","TIPO PROMO","COMBINACION","TMP","TC","FECHA INICIO","FECHA FINAL","PRECIO NORMAL"]],n=0;
   filas.forEach(function(f){if(!f.ok)return;n++;var t=String(f.tmp).replace(/\./g,"").replace(",",".");
-    rows.push([n,f.desc,"",f.tipo,f.comb,f.tipo==="DESCTO"&&+t>1?+t/100:(+t||t),f.tc?+String(f.tc).replace(/\./g,""):"",f.desde,f.hasta])});
+    rows.push([n,f.desc,"",f.tipo,f.comb,f.tipo==="DESCTO"&&+t>1?+t/100:(+t||t),f.tc?+String(f.tc).replace(/\./g,""):"",f.desde,f.hasta,f.ref?+String(f.ref).replace(/\D/g,""):""])});
   var wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(rows),"Catalogo");
   var out=XLSX.write(wb,{type:"array",bookType:"xlsx"});
   var file=new File([out],"catalogo_desde_foto.xlsx",{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"});
