@@ -1539,8 +1539,17 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     return d.getUTCFullYear() + "-" + String(d.getUTCMonth()+1).padStart(2,"0") + "-" + String(d.getUTCDate()).padStart(2,"0");
   }
   // Precio por kilo / litro a partir del gramaje del nombre (ej. "250 GR", "3UN 170ML")
+  function pnrMetro(nombre,precio){ // papel higiénico, toalla de papel, servilletas, film, alusa: PPUM por METRO
+    var n=String(nombre||"").toUpperCase().replace(/\n/g," ").replace(/,/g,".");
+    var esPapel=/PAPEL|TOALLA|HIGIEN|SERVILLETA|ROLLO|FILM|ALUSA|ALUMINIO|ENVOLTURA|ABSORBENTE/.test(n);
+    var mm=n.match(/(\d+(?:\.\d+)?)\s*(MTS|MT|METROS?|M)\b/);if(!mm||(mm[2]==="M"&&!esPapel))return null;
+    var q=+mm[1];if(!(q>0))return null;
+    var r=n.match(/(\d+)\s*X\s*\d+(?:\.\d+)?\s*(MTS|MT|METROS?|M)\b/)||n.match(/(\d+)\s*(ROLLOS?|RLL|UN|UND|UNID|UNIDADES|U)\b/);
+    var k=r?(+r[1]||1):1,tot=k*q;return {unidad:"METRO",valor:Math.round(precio/tot),total:tot}}
+  
   function precioPorUnidad(nombre, precio, um){
     if (String(um).toUpperCase() === "KG") return { unidad:"KILO", valor: precio };
+    var pmt = pnrMetro(nombre, precio); if (pmt) return { unidad:"METRO", valor: pmt.valor };
     var n = String(nombre).toUpperCase();
     var packs = 1, mp = n.match(/(\d+)\s*UN\b/); if (mp) packs = Number(mp[1]) || 1;
     var re = /(\d+(?:[.,]\d+)?)\s*(KG|KILO|GRS?|G|ML|CC|LTS?|L)\b/g, m, last = null, lastLiq = null;
@@ -2003,5 +2012,34 @@ a.innerHTML='<span class="fl">←</span><svg viewBox="0 0 24 24" fill="none" str
 a.addEventListener("click",function(e){if(e.ctrlKey||e.metaKey||e.shiftKey)return;e.preventDefault();var u=a.href;
   if(window.matchMedia&&matchMedia("(prefers-reduced-motion: reduce)").matches){location.href=u;return}
   document.body.classList.add("pnr-saliendo");setTimeout(function(){location.href=u},260)});
+})();</script>
+<style id="pnr-acc-css">
+.pnr-acc{position:sticky;top:0;z-index:8;background:#fff;margin:6px -16px 8px;padding:8px 16px 2px;box-shadow:0 6px 8px -8px rgba(0,0,0,.25)}
+.pnr-acc .pnr-cta{margin:0 0 8px!important}.pnr-acc .pnr-vaciar{margin:0 0 6px!important}
+@media (max-width:900px){.pnr-acc{top:56px}}
+.pnr-aviso{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);z-index:300;background:#1d1d1b;color:#fff;border-radius:12px;padding:12px 14px 12px 18px;display:flex;gap:12px;align-items:center;font:600 14px system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;box-shadow:0 10px 30px rgba(0,0,0,.35)}
+.pnr-aviso button{all:unset;cursor:pointer;padding:8px 14px;border-radius:8px;font-weight:800}
+.pnr-aviso .si{background:#e1251b;color:#fff}.pnr-aviso .no{color:#ccc}
+@media print{.pnr-aviso{display:none!important}}
+</style>
+<script id="pnr-acc-js">(function(){
+// 1) "+ Nuevo cartel" y "Vaciar lista" siempre a la vista: quedan fijos arriba del panel al hacer scroll
+var c=document.querySelector(".pnr-cta"),v=document.querySelector(".pnr-vaciar"),ref=c||v;
+if(ref&&!ref.parentNode.classList.contains("pnr-acc")){var w=document.createElement("div");w.className="pnr-acc";ref.parentNode.insertBefore(w,ref);if(c)w.appendChild(c);if(v)w.appendChild(v)}
+// al crear un cartel nuevo, el cursor va directo a la descripción
+if(c)c.addEventListener("click",function(){setTimeout(function(){var t=document.querySelector('.item.sel textarea,.item-b textarea[data-f="nombre"],.producto:last-child [data-field="nombre"],.item.sel [data-k="desc"]');if(t){t.focus();t.scrollIntoView({block:"center",behavior:"smooth"})}},250)});
+// 2) después de imprimir o descargar el PDF, ofrecer vaciar la lista
+var vb=[].filter.call(document.querySelectorAll(".pnr-bar .pnr-btn"),function(x){return x.textContent.trim()==="Vaciar"})[0];if(!vb)return;
+var impreso=false,abierto=false;
+function vaciar(){var oc=window.confirm;window.confirm=function(){return true};try{vb.click()}finally{setTimeout(function(){window.confirm=oc},0)}}
+function aviso(){if(abierto)return;abierto=true;var a=document.createElement("div");a.className="pnr-aviso";
+  a.innerHTML='<span>¿Ya imprimiste? Vacía la lista para empezar los siguientes carteles.</span><button class="si">Vaciar lista</button><button class="no">Mantener</button>';
+  document.body.appendChild(a);var t=setTimeout(cerrar,15000);
+  function cerrar(){clearTimeout(t);a.remove();abierto=false}
+  a.querySelector(".si").onclick=function(){cerrar();vaciar()};a.querySelector(".no").onclick=cerrar}
+[].forEach.call(document.querySelectorAll(".pnr-bar .pnr-btn"),function(b){if(/Imprimir|PDF/i.test(b.textContent))b.addEventListener("click",function(){impreso=true},true)});
+window.addEventListener("afterprint",function(){if(impreso){impreso=false;setTimeout(aviso,300)}});
+// los PDF que se descargan (sin cuadro de impresión) avisan al terminar la descarga
+var ck=HTMLAnchorElement.prototype.click;HTMLAnchorElement.prototype.click=function(){var r=ck.apply(this,arguments);if(this.hasAttribute("download")&&impreso){impreso=false;setTimeout(aviso,800)}return r};
 })();</script>
 </body></html>
