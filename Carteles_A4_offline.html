@@ -374,6 +374,7 @@ function itemHTML(p){
   return h + '</div>';
 }
 function opt(v, cur, txt){ return '<option value="' + v + '"' + (String(cur) === v ? " selected" : "") + '>' + txt + '</option>'; }
+function resumenMas(p){ var pu = ppumDe(p, p.precio); return 'Más opciones · PPUM ' + (pu && pu.valor ? 'POR ' + esc(pu.unidad) + ' $' + fmt(pu.valor) : 'automático') + ' · copias ' + esc(p.copias); }
 function editorHTML(p){
   var combo = p.tipo === "PACK" || p.tipo === "NXM";
   return '<div class="item-b">' +
@@ -384,7 +385,7 @@ function editorHTML(p){
     '<div class="pc-op" style="grid-column:1/-1"><label><input type="checkbox" data-f="tc"' + (p.tc ? " checked" : "") + '> Precio tarjeta Cencosud</label><input type="number" data-f="precioOtros" placeholder="$ otros medios" value="' + esc(p.tc ? p.precioOtros : "") + '"' + (p.tc ? '' : ' disabled') + '></div>' +
     '<label class="chk"><input type="checkbox" data-f="alcohol"' + (p.alcohol ? " checked" : "") + '> Advertencia alcohol</label>' +
     '<label class="chk"><input type="checkbox" data-f="cuarto"' + (p.cuarto ? " checked" : "") + '> Precio por 1/4 kg</label>' +
-    '<details class="pc-mas" style="grid-column:1/-1"' + (p._mas ? ' open' : '') + '><summary>Más opciones · PPUM automático · copias ' + esc(p.copias) + '</summary><div class="pc-g3">' +
+    '<details class="pc-mas" style="grid-column:1/-1"' + (p._mas ? ' open' : '') + '><summary>' + resumenMas(p) + '</summary><div class="pc-g3">' +
       '<label style="grid-column:span 2">Venta por<select data-f="um">' + opt("UN",p.um,"Unidad / envase") + opt("KG",p.um,"Kilo (granel)") + '</select></label>' +
       '<label>Copias<input type="number" min="1" data-f="copias" value="' + esc(p.copias) + '"></label></div></details>' +
     '<div class="row" style="grid-column:1/-1;justify-content:flex-end"><button class="btn sm" data-act="dup">Duplicar</button><button class="btn sm" data-act="del">Eliminar</button></div>' +
@@ -414,7 +415,12 @@ function onField(e, full){
   renderPreview();
 }
 lista.addEventListener("toggle", function(e){ var it = e.target.closest && e.target.closest(".item"); if (!it) return; var p = prod(it.dataset.id); if (p) p._mas = e.target.open; }, true);
-lista.addEventListener("input", function(e){ if (e.target.tagName === "TEXTAREA" || e.target.type === "number" || e.target.type === "text") onField(e, false); });
+lista.addEventListener("input", function(e){ if (e.target.tagName === "TEXTAREA" || e.target.type === "number" || e.target.type === "text") onField(e, false); refrescarItem(e); });
+// el nombre, el precio y el PPUM calculado se actualizan en la lista mientras escribes
+function refrescarItem(e){ var it = e.target.closest && e.target.closest(".item"); if (!it) return; var p = prod(it.dataset.id); if (!p) return;
+  var nm = it.querySelector(".item-h .nm"); if (nm && nm.firstChild && nm.firstChild.nodeType === 3) nm.firstChild.nodeValue = p.nombre.replace(/\n/g," ") || "(sin nombre)";
+  var pr = it.querySelector(".item-h .pr"); if (pr) pr.textContent = precioCorto(p);
+  var sm = it.querySelector(".pc-mas summary"); if (sm) sm.innerHTML = resumenMas(p); }
 lista.addEventListener("change", function(e){ if (e.target.dataset.f && (e.target.tagName === "SELECT" || e.target.type === "checkbox")) onField(e, true); });
 
 document.getElementById("buscar").addEventListener("input", function(e){ filtro = e.target.value; renderLista(); });

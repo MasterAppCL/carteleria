@@ -1104,6 +1104,9 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
               '<div class="field"><label>Vigencia desde' + (p.desde ? '' : ' <small style="font-weight:400">(general)</small>') + '</label><input type="date" data-field="desde" value="' + esc(p.desde || state.global.desde) + '"' + (p.desde ? '' : ' style="color:#8a857c"') + '></div>' +
               '<div class="field"><label>Vigencia hasta' + (p.hasta ? '' : ' <small style="font-weight:400">(general)</small>') + '</label><input type="date" data-field="hasta" value="' + esc(p.hasta || state.global.hasta) + '"' + (p.hasta ? '' : ' style="color:#8a857c"') + '></div>' +
             '</div>' +
+            '<div class="field" style="margin:2px 0 8px"><label>PPUM por</label><select data-field="ppumU">' +
+              [["","Automático"],["KILO","Kilo"],["UNIDAD","Unidad"],["METRO","Metro"],["LITRO","Litro"]].map(function(o){ return '<option value="' + o[0] + '"' + ((p.ppumU || "") === o[0] ? " selected" : "") + '>' + o[1] + '</option>'; }).join("") +
+            '</select></div>' +
             '<div class="copias-row"><span style="font-size:12px;font-weight:600;color:#6d6a64">Copias en la hoja</span><div class="stepper">' +
               '<button type="button" data-action="copias-menos" aria-label="Restar copia">–</button><span>' + p.copias + '</span>' +
               '<button type="button" data-action="copias-mas" aria-label="Sumar copia">+</button></div></div>' +
@@ -1119,7 +1122,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     var pr = Number(p.precio);
     if (!(pr > 0) || p.tipo === "DESCTO" || p.tipo === "NXM"){ p.tieneUnidad = false; return; }
     var um = (p.unidad === "KILO" && Number(p.precioUnidad) === pr && !/\d\s*(KG|KILO|GRS?|G|ML|CC|LTS?|L|UN)\b/i.test(p.nombre || "")) ? "KG" : "UN";
-    var pu = precioPorUnidad(p.nombre || "", p.tipo === "PACK" ? pr / (Number(p.combo) || 1) : pr, um);
+    var pu = precioPorUnidad(p.nombre || "", p.tipo === "PACK" ? pr / (Number(p.combo) || 1) : pr, um, p.ppumU || "");
     if (pu){ p.tieneUnidad = true; p.unidad = pu.unidad; p.precioUnidad = pu.valor; } else p.tieneUnidad = false;
   }
   function cardHTML(p){
@@ -1408,7 +1411,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     } else {
       p[field] = e.target.value;
       if ((field === "desde" || field === "hasta") && p[field] === state.global[field]) p[field] = "";
-      if (field === "nombre" || field === "precio" || field === "combo"){
+      if (field === "nombre" || field === "precio" || field === "combo" || field === "ppumU"){
         calcPPUM(p);
         var sm = row.querySelector(".pc-mas summary"); if (sm) sm.textContent = "Más opciones · PPUM " + (p.tieneUnidad && p.precioUnidad ? p.unidad + " $" + fmtCLP(p.precioUnidad) : "automático") + " · copias " + p.copias;
       }
@@ -1547,30 +1550,42 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     var r=n.match(/(\d+)\s*X\s*\d+(?:\.\d+)?\s*(MTS|MT|METROS?|M)\b/)||n.match(/(\d+)\s*(ROLLOS?|RLL|UN|UND|UNID|UNIDADES|U)\b/);
     var k=r?(+r[1]||1):1,tot=k*q;return {unidad:"METRO",valor:Math.round(precio/tot),total:tot}}
   
-  function precioPorUnidad(nombre, precio, um){
-    if (String(um).toUpperCase() === "KG") return { unidad:"KILO", valor: precio };
-    var pmt = pnrMetro(nombre, precio); if (pmt) return { unidad:"METRO", valor: pmt.valor };
-    var n = String(nombre).toUpperCase();
-    var packs = 1, mp = n.match(/(\d+)\s*UN\b/); if (mp) packs = Number(mp[1]) || 1;
-    var re = /(\d+(?:[.,]\d+)?)\s*(KG|KILO|GRS?|G|ML|CC|LTS?|L)\b/g, m, last = null, lastLiq = null;
-    while ((m = re.exec(n))){ last = m; if (/^(ML|CC|LTS?|L)$/.test(m[2])) lastLiq = m; }
-    // Si hay volumen (CC, ML, L) manda sobre "G": en vinos la "G" son grados (ej. "1.5L 8G")
-    if (lastLiq) last = lastLiq;
-    // Sin gramaje ni volumen: todo producto lleva PPUM, se informa por unidad (ej. "HUEVO 20UN" = precio / 20)
-    if (!last){
-      var mu = n.match(/(\d+)\s*(UNIDADES|UNID|UN|U)\b/);
-      var cant = mu ? (Number(mu[1]) || 1) : 1;
-      return { unidad:"UNIDAD", valor: Math.round(precio / cant) };
+  function precioPorUnidad(nombre, precio, um, forzar){
+    var n = String(nombre || "").toUpperCase().replace(/\n/g, " ").replace(/,/g, ".");
+    var mx = n.match(/(\d+)\s*X\s*\d/), packs = mx ? (Number(mx[1]) || 1) : 1;
+    var mu = n.match(/(\d+)\s*(UNIDADES|UNID|UND|UN|U|ROLLOS?|RLL)\b/), cantUn = mu ? (Number(mu[1]) || 1) : 1;
+    // contenido del envase en kilos o litros (con packs "6X470CC")
+    function peso(liq){
+      var re = /(\d+(?:\.\d+)?)\s*(KG|KILOS?|GRS?|G|ML|CC|LTS?|L)\b/g, m, last = null;
+      while ((m = re.exec(n))){ var esLiq = /^(ML|CC|LTS?|L)$/.test(m[2]); if (esLiq === liq) last = m; }
+      if (!last) return 0;
+      var q = parseFloat(last[1]), u = last[2];
+      var base = /^(KG|KILOS?|LTS?|L)$/.test(u) && q < 100 ? q : q / 1000;
+      return base * packs;
     }
-    var q = parseFloat(last[1].replace(",", ".")), u = last[2];
-    if (!(q > 0)) return null;
-    var liquido = /^(ML|CC|LTS?|L)$/.test(u);
-    // "1250 LT" es un error típico: más de 100 litros se toma como CC
-    var base = /^(KG|KILO|LTS?|L)$/.test(u) && q < 100 ? q * 1000 : q;
-    var total = base * packs;
-    if (total <= 0) return null;
-    return { unidad: liquido ? "LITRO" : "KILO", valor: Math.round(precio * 1000 / total) };
+    // unidad elegida a mano (cuando el cálculo automático no corresponde)
+    if (forzar){
+      var tot = 1;
+      if (forzar === "KILO") tot = peso(false) || 1;
+      else if (forzar === "LITRO") tot = peso(true) || 1;
+      else if (forzar === "METRO"){ var mt = pnrMetro(n, precio); tot = mt ? mt.total : 1; }
+      else tot = Math.max(cantUn, packs, 1);
+      return { unidad: forzar, valor: Math.round(precio / tot) };
+    }
+    if (String(um).toUpperCase() === "KG") return { unidad:"KILO", valor: precio };
+    // papel higiénico, toalla de papel, servilletas: por metro
+    var pmt = pnrMetro(n, precio); if (pmt) return { unidad:"METRO", valor: pmt.valor };
+    // más de una unidad (12 UN, 30UN, 2 UNIDADES): por unidad
+    if (cantUn > 1) return { unidad:"UNIDAD", valor: Math.round(precio / cantUn) };
+    // volumen manda sobre gramos (en vinos la "G" son grados)
+    var l = peso(true); if (l > 0) return { unidad:"LITRO", valor: Math.round(precio / l) };
+    var k = peso(false); if (k > 0) return { unidad:"KILO", valor: Math.round(precio / k) };
+    // granel o "KG" sin número: el precio es por kilo
+    if (/\b(KG|KILOS?|GRANEL)\b/.test(n)) return { unidad:"KILO", valor: precio };
+    // producto unitario
+    return { unidad:"UNIDAD", valor: precio };
   }
+
 
   var impStatus = document.getElementById("imp-status");
   try { var ls = localStorage.getItem("cartel_local"); if (ls) document.getElementById("imp-local").value = ls; } catch(e){}
