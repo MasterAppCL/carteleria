@@ -192,7 +192,7 @@ var uid = 0, abierto = null;
 function nid(){ uid++; return "a" + Date.now().toString(36) + uid; }
 function nuevo(v){
   return Object.assign({ id:nid(), sel:false, nombre:"", sap:"", seccion:"", tipo:"PRECIO", precio:"", combo:"",
-    tc:false, precioOtros:"", alcohol:false, cuarto:false, um:"UN", ppumManual:"", unidadManual:"", verPPUM:true, copias:2 }, v || {});
+    tc:false, precioOtros:"", alcohol:false, cuarto:false, um:"UN", ppumManual:"", unidadManual:"", verPPUM:true, copias:1 }, v || {});
 }
 
 // ---------- helpers ----------
