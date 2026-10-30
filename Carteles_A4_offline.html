@@ -220,9 +220,18 @@ function pnrMetro(nombre,precio){ // papel higiénico, toalla de papel, serville
   var q=+mm[1];if(!(q>0))return null;
   var r=n.match(/(\d+)\s*X\s*\d+(?:\.\d+)?\s*(MTS|MT|METROS?|M)\b/)||n.match(/(\d+)\s*(ROLLOS?|RLL|UN|UND|UNID|UNIDADES|U)\b/);
   var k=r?(+r[1]||1):1,tot=k*q;return {unidad:"METRO",valor:Math.round(precio/tot),total:tot}}
+function pnrLitros(nombre){ // CC, ML, LT, LITRO: contenido total en litros (con packs y unidades)
+  var n=String(nombre||"").toUpperCase().replace(/\n/g," ").replace(/,/g,".");
+  function lt(q,u){return /^(CC|ML)$/.test(u)?q/1000:(q<100?q:q/1000)}
+  var mx=n.match(/(\d+)\s*X\s*(\d+(?:\.\d+)?)\s*(CC|ML|LTS?|LITROS?|L)\b/);if(mx)return (+mx[1]||1)*lt(+mx[2],mx[3]);
+  var m=n.match(/(\d+(?:\.\d+)?)\s*(CC|ML|LTS?|LITROS?|L)\b/);
+  if(m){var c=n.match(/(\d+)\s*(UNIDADES|UNID|UND|UN|U)\b/);return lt(+m[1],m[2])*(c?(+c[1]||1):1)}
+  return /\b(LITROS?|LTS?)\b/.test(n)?1:0}
+
 function precioPorUnidad(nombre, precio, um){
   if (String(um).toUpperCase() === "KG") return { unidad:"KILO", valor: precio };
   var pmt = pnrMetro(nombre, precio); if (pmt) return { unidad:"METRO", valor: pmt.valor };
+  var vlt = pnrLitros(nombre); if (vlt > 0) return { unidad:"LITRO", valor: Math.round(precio / vlt) };
   var n = String(nombre).toUpperCase().replace(/\n/g," ");
   var packs = 1, mp = n.match(/(\d+)\s*UN\b/); if (mp) packs = Number(mp[1]) || 1;
   var mx = n.match(/(\d+)\s*X\s*(\d+(?:[.,]\d+)?)\s*(KG|GRS?|G|ML|CC|LTS?|L)\b/);

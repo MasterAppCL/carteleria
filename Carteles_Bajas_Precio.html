@@ -1549,6 +1549,14 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     var q=+mm[1];if(!(q>0))return null;
     var r=n.match(/(\d+)\s*X\s*\d+(?:\.\d+)?\s*(MTS|MT|METROS?|M)\b/)||n.match(/(\d+)\s*(ROLLOS?|RLL|UN|UND|UNID|UNIDADES|U)\b/);
     var k=r?(+r[1]||1):1,tot=k*q;return {unidad:"METRO",valor:Math.round(precio/tot),total:tot}}
+function pnrLitros(nombre){ // CC, ML, LT, LITRO: contenido total en litros (con packs y unidades)
+  var n=String(nombre||"").toUpperCase().replace(/\n/g," ").replace(/,/g,".");
+  function lt(q,u){return /^(CC|ML)$/.test(u)?q/1000:(q<100?q:q/1000)}
+  var mx=n.match(/(\d+)\s*X\s*(\d+(?:\.\d+)?)\s*(CC|ML|LTS?|LITROS?|L)\b/);if(mx)return (+mx[1]||1)*lt(+mx[2],mx[3]);
+  var m=n.match(/(\d+(?:\.\d+)?)\s*(CC|ML|LTS?|LITROS?|L)\b/);
+  if(m){var c=n.match(/(\d+)\s*(UNIDADES|UNID|UND|UN|U)\b/);return lt(+m[1],m[2])*(c?(+c[1]||1):1)}
+  return /\b(LITROS?|LTS?)\b/.test(n)?1:0}
+
   
   function precioPorUnidad(nombre, precio, um, forzar){
     var n = String(nombre || "").toUpperCase().replace(/\n/g, " ").replace(/,/g, ".");
@@ -1567,7 +1575,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     if (forzar){
       var tot = 1;
       if (forzar === "KILO") tot = peso(false) || 1;
-      else if (forzar === "LITRO") tot = peso(true) || 1;
+      else if (forzar === "LITRO") tot = pnrLitros(n) || 1;
       else if (forzar === "METRO"){ var mt = pnrMetro(n, precio); tot = mt ? mt.total : 1; }
       else tot = Math.max(cantUn, packs, 1);
       return { unidad: forzar, valor: Math.round(precio / tot) };
@@ -1575,6 +1583,8 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     if (String(um).toUpperCase() === "KG") return { unidad:"KILO", valor: precio };
     // papel higiénico, toalla de papel, servilletas: por metro
     var pmt = pnrMetro(n, precio); if (pmt) return { unidad:"METRO", valor: pmt.valor };
+    // CC, ML, LT o LITRO: siempre por litro
+    var vlt = pnrLitros(n); if (vlt > 0) return { unidad:"LITRO", valor: Math.round(precio / vlt) };
     // más de una unidad (12 UN, 30UN, 2 UNIDADES): por unidad
     if (cantUn > 1) return { unidad:"UNIDAD", valor: Math.round(precio / cantUn) };
     // volumen manda sobre gramos (en vinos la "G" son grados)
