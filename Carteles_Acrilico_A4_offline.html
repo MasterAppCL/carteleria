@@ -193,15 +193,25 @@ function ppumCalc(desc,P,um,seccion){
   return {precio:P,suf:"",ppum:"PRECIO X UN   $"+money(P)}
 }
 
+function kgDe(d){var mx=d.match(/(\d+)\s*X\s*(\d+(?:[.,]\d+)?)\s*(KG|KILOS?|GRS?|G)\b/),m=mx||d.match(/(\d+(?:[.,]\d+)?)\s*(KG|KILOS?|GRS?|G)\b/);if(!m)return 0;
+  var q=+String(mx?m[2]:m[1]).replace(",","."),un=mx?m[3]:m[2],k=/^G/.test(un)?q/1000:q;return k*(mx?(+mx[1]||1):1)}
 function recalcPPUM(it){
   var raw=String(it.precio==null?"":it.precio).trim();
   if(/%/.test(raw))return "DE DESCUENTO";
   if(/\d\s*X\s*\d/i.test(raw))return it.ppum; // 3X2 y similares: se deja como está
   var P=num(raw);if(!(P>0))return it.ppum;
   var mn=String(it.pre||"").match(/(\d+)\s*x/i),n=mn?+mn[1]:1;if(!(n>0))n=1;
-  var u=P/n,suf=String(it.suf||"").toUpperCase().replace(/\s/g,"");
-  if(suf==="1/4KG")return "PRECIO X KG   $"+money(u*4);
-  if(suf==="KG")return "PRECIO X KG   $"+money(u);
+  var u=P/n,suf=String(it.suf||"").toUpperCase().replace(/\s/g,""),dsc=String(it.desc||"").toUpperCase();
+  // 1/4 de kilo (en "Después" o en la descripción): el precio por kilo es el precio x 4
+  var cuarto=/^1\/4(KG|KILOS?|K)?$/.test(suf)||/1\s*\/\s*4\s*(KG|KILOS?)\b/.test(dsc);
+  var fz=it.ppumU||"";
+  if(fz){var tot=1;
+    if(fz==="KILO"){if(cuarto)return "PRECIO X KG   $"+money(u*4);tot=kgDe(dsc)||1;return "PRECIO X KG   $"+money(u/tot)}
+    if(fz==="LITRO")tot=pnrLitros(dsc)||1;else if(fz==="METRO"){var mt=pnrMetro(dsc,u);tot=mt?mt.total:1}
+    else{var c=dsc.match(/(\d+)\s*(UNIDADES|UNID|UND|UN|U|ROLLOS?)\b/)||dsc.match(/(\d+)\s*X\s*\d/);tot=c?(+c[1]||1):1}
+    return "PRECIO X "+(fz==="UNIDAD"?"UN":fz)+"   $"+money(u/tot)}
+  if(cuarto)return "PRECIO X KG   $"+money(u*4);
+  if(suf==="KG"||suf==="KILO")return "PRECIO X KG   $"+money(u);
   return ppumCalc(it.desc.replace(/GRANEL/ig,""),u,"","").ppum;
 }
 /* ---------- Excel ---------- */
@@ -338,6 +348,7 @@ function renderList(){
       '<div class="f"><label>Antes del precio</label><input data-k="pre" value="'+esc(it.pre)+'" placeholder="ej: 2 x"></div>'+
       '<div class="f"><label>Después</label><input data-k="suf" value="'+esc(it.suf)+'" placeholder="ej: KG"></div></div>'+
       '<details class="pc-mas"'+(it._mas?' open':'')+'><summary>Más opciones · PPUM '+esc((recalcPPUM(it)||"automático").replace(/\s+/g," "))+' · copias '+esc(it.copias||1)+'</summary>'+
+        '<div class="f" style="margin-bottom:6px"><label>PPUM por</label><select data-k="ppumU">'+[["","Automático"],["KILO","Kilo"],["UNIDAD","Unidad"],["METRO","Metro"],["LITRO","Litro"]].map(function(o){return '<option value="'+o[0]+'"'+((it.ppumU||"")===o[0]?' selected':'')+'>'+o[1]+'</option>'}).join("")+'</select></div>'+
         '<div class="pc-g3"><div class="f"><label>Desde</label><input type="date" data-k="desde" value="'+esc(it.desde)+'"></div>'+
         '<div class="f"><label>Hasta</label><input type="date" data-k="hasta" value="'+esc(it.hasta)+'"></div>'+
         '<div class="f"><label>Copias</label><input type="number" min="1" data-k="copias" value="'+esc(it.copias)+'" placeholder="1"></div></div>'+
@@ -371,7 +382,7 @@ $("list").addEventListener("input",function(e){
   var it=items.find(function(x){return x.id===id});it[k]=e.target.value;
   var box=e.target.closest(".item"),auto=box.querySelector("[data-auto]");
   // PPUM siempre automático
-  if(/^(desc|precio|pre|suf)$/.test(k)){it.ppumAuto=true;it.ppum=recalcPPUM(it);var sm=box.querySelector(".pc-mas summary");if(sm)sm.textContent="Más opciones · PPUM "+String(it.ppum||"automático").replace(/\s+/g," ")+" · copias "+(it.copias||1)}
+  if(/^(desc|precio|pre|suf|ppumU)$/.test(k)){it.ppumAuto=true;it.ppum=recalcPPUM(it);var sm=box.querySelector(".pc-mas summary");if(sm)sm.textContent="Más opciones · PPUM "+String(it.ppum||"automático").replace(/\s+/g," ")+" · copias "+(it.copias||1)}
   save();updateOne(id)});
 $("list").addEventListener("toggle",function(e){var b=e.target.closest&&e.target.closest(".item");if(!b)return;var it=items.find(function(x){return x.id===b.getAttribute("data-id")});if(it)it._mas=e.target.open},true);
 $("list").addEventListener("change",function(e){
