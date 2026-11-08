@@ -227,32 +227,28 @@ function pnrLitros(nombre){ // CC, ML, LT, LITRO: contenido total en litros (con
   var m=n.match(/(\d+(?:\.\d+)?)\s*(CC|ML|LTS?|LITROS?|L)\b/);
   if(m){var c=n.match(/(\d+)\s*(UNIDADES|UNID|UND|UN|U)\b/);return lt(+m[1],m[2])*(c?(+c[1]||1):1)}
   return /\b(LITROS?|LTS?)\b/.test(n)?1:0}
+function pnrPPUM(nombre,precio,forzar){ // regla única de PPUM para todos los formatos
+  var n=" "+String(nombre||"").toUpperCase().replace(/\n/g," ").replace(/,/g,".")+" ";
+  var fr=n.match(/(\d+)\s*\/\s*(\d+)\s*(KG|KILOS?|K)\b/); // 1/4 KG, 1/2 KILO
+  function kg(){if(fr)return (+fr[1])/(+fr[2]||1);
+    var mx=n.match(/(\d+)\s*X\s*(\d+(?:\.\d+)?)\s*(KG|KILOS?|GRS?|G)\b/);if(mx){var q=+mx[2];return (+mx[1]||1)*(/^G/.test(mx[3])?q/1000:q)}
+    var m=n.match(/(\d+(?:\.\d+)?)\s*(KG|KILOS?|GRS?|G)\b/);if(m){var q2=+m[1];return /^G/.test(m[2])?q2/1000:q2}return 0}
+  var cu=n.match(/(\d+)\s*(UNIDADES|UNIDAD|UNID|UND|UN|U|ROLLOS?|RLL)\b/),cant=cu?(+cu[1]||1):1,mp=n.match(/(\d+)\s*X\s*\d/),packs=mp?(+mp[1]||1):1;
+  function r(u,t){t=t||1;return {u:u,v:Math.round(precio/t),tot:t}}
+  if(forzar){if(forzar==="KILO")return r("KILO",kg()||1);if(forzar==="LITRO")return r("LITRO",pnrLitros(n)||1);
+    if(forzar==="METRO"){var m1=pnrMetro(n,precio);return r("METRO",m1?m1.total:1)}return r("UNIDAD",Math.max(cant,packs,1))}
+  var mt=pnrMetro(n,precio);if(mt)return r("METRO",mt.total);           // papel higiénico, toalla: metro
+  if(/\b(KG|KILOS?|GRANEL)\b/.test(n)||fr)return r("KILO",kg()||1);       // dice KG o KILO: siempre por kilo
+  var l=pnrLitros(n);if(l>0)return r("LITRO",l);                        // CC, ML, LT, LITRO: litro
+  if(cant>1)return r("UNIDAD",cant);                                    // más de una unidad: por unidad
+  var k=kg();if(k>0)return r("KILO",k);                                 // gramos: por kilo
+  return r("UNIDAD",1)}
 
-function precioPorUnidad(nombre, precio, um){
-  if (String(um).toUpperCase() === "KG") return { unidad:"KILO", valor: precio };
-  var pmt = pnrMetro(nombre, precio); if (pmt) return { unidad:"METRO", valor: pmt.valor };
-  var vlt = pnrLitros(nombre); if (vlt > 0) return { unidad:"LITRO", valor: Math.round(precio / vlt) };
-  var n = String(nombre).toUpperCase().replace(/\n/g," ");
-  var packs = 1, mp = n.match(/(\d+)\s*UN\b/); if (mp) packs = Number(mp[1]) || 1;
-  var mx = n.match(/(\d+)\s*X\s*(\d+(?:[.,]\d+)?)\s*(KG|GRS?|G|ML|CC|LTS?|L)\b/);
-  if (mx){ packs = Number(mx[1]) || 1; }
-  var re = /(\d+(?:[.,]\d+)?)\s*(KG|KILO|GRS?|G|ML|CC|LTS?|L)\b/g, m, last = null, lastLiq = null;
-  while ((m = re.exec(n))){ last = m; if (/^(ML|CC|LTS?|L)$/.test(m[2])) lastLiq = m; }
-  if (lastLiq) last = lastLiq;
-  if (mx && (!lastLiq || /^(ML|CC|LTS?|L)$/.test(mx[3]))) last = [mx[0], mx[2], mx[3]];
-  if (!last){
-    var mu = n.match(/(\d+)\s*(UNIDADES|UNID|UN|U)\b/);
-    var cant = mu ? (Number(mu[1]) || 1) : 1;
-    return { unidad:"UNIDAD", valor: Math.round(precio / cant) };
+
+function precioPorUnidad(nombre, precio, um, forzar){
+    if (!forzar && String(um).toUpperCase() === "KG") return { unidad:"KILO", valor: precio };
+    var x = pnrPPUM(nombre, precio, forzar); return { unidad: x.u, valor: x.v };
   }
-  var q = parseFloat(String(last[1]).replace(",", ".")), u = last[2];
-  if (!(q > 0)) return null;
-  var liquido = /^(ML|CC|LTS?|L)$/.test(u);
-  var base = /^(KG|KILO|LTS?|L)$/.test(u) && q < 100 ? q * 1000 : q;
-  var total = base * packs;
-  if (total <= 0) return null;
-  return { unidad: liquido ? "LITRO" : "KILO", valor: Math.round(precio * 1000 / total) };
-}
 function ppumDe(p, precio){
   if (!(Number(precio) > 0)) return null;
   if (p.cuarto) return { unidad:"KILO", valor: Math.round(Number(precio) * 4) };

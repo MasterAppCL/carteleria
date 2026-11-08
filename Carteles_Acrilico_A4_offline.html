@@ -167,6 +167,23 @@ function pnrLitros(nombre){ // CC, ML, LT, LITRO: contenido total en litros (con
   var m=n.match(/(\d+(?:\.\d+)?)\s*(CC|ML|LTS?|LITROS?|L)\b/);
   if(m){var c=n.match(/(\d+)\s*(UNIDADES|UNID|UND|UN|U)\b/);return lt(+m[1],m[2])*(c?(+c[1]||1):1)}
   return /\b(LITROS?|LTS?)\b/.test(n)?1:0}
+function pnrPPUM(nombre,precio,forzar){ // regla única de PPUM para todos los formatos
+  var n=" "+String(nombre||"").toUpperCase().replace(/\n/g," ").replace(/,/g,".")+" ";
+  var fr=n.match(/(\d+)\s*\/\s*(\d+)\s*(KG|KILOS?|K)\b/); // 1/4 KG, 1/2 KILO
+  function kg(){if(fr)return (+fr[1])/(+fr[2]||1);
+    var mx=n.match(/(\d+)\s*X\s*(\d+(?:\.\d+)?)\s*(KG|KILOS?|GRS?|G)\b/);if(mx){var q=+mx[2];return (+mx[1]||1)*(/^G/.test(mx[3])?q/1000:q)}
+    var m=n.match(/(\d+(?:\.\d+)?)\s*(KG|KILOS?|GRS?|G)\b/);if(m){var q2=+m[1];return /^G/.test(m[2])?q2/1000:q2}return 0}
+  var cu=n.match(/(\d+)\s*(UNIDADES|UNIDAD|UNID|UND|UN|U|ROLLOS?|RLL)\b/),cant=cu?(+cu[1]||1):1,mp=n.match(/(\d+)\s*X\s*\d/),packs=mp?(+mp[1]||1):1;
+  function r(u,t){t=t||1;return {u:u,v:Math.round(precio/t),tot:t}}
+  if(forzar){if(forzar==="KILO")return r("KILO",kg()||1);if(forzar==="LITRO")return r("LITRO",pnrLitros(n)||1);
+    if(forzar==="METRO"){var m1=pnrMetro(n,precio);return r("METRO",m1?m1.total:1)}return r("UNIDAD",Math.max(cant,packs,1))}
+  var mt=pnrMetro(n,precio);if(mt)return r("METRO",mt.total);           // papel higiénico, toalla: metro
+  if(/\b(KG|KILOS?|GRANEL)\b/.test(n)||fr)return r("KILO",kg()||1);       // dice KG o KILO: siempre por kilo
+  var l=pnrLitros(n);if(l>0)return r("LITRO",l);                        // CC, ML, LT, LITRO: litro
+  if(cant>1)return r("UNIDAD",cant);                                    // más de una unidad: por unidad
+  var k=kg();if(k>0)return r("KILO",k);                                 // gramos: por kilo
+  return r("UNIDAD",1)}
+
 
 function ppumCalc(desc,P,um,seccion){
   var pmt=pnrMetro(desc,P);if(pmt)return {precio:P,suf:"",ppum:"PRECIO X METRO   $"+money(pmt.valor)};
@@ -205,14 +222,9 @@ function recalcPPUM(it){
   // 1/4 de kilo (en "Después" o en la descripción): el precio por kilo es el precio x 4
   var cuarto=/^1\/4(KG|KILOS?|K)?$/.test(suf)||/1\s*\/\s*4\s*(KG|KILOS?)\b/.test(dsc);
   var fz=it.ppumU||"";
-  if(fz){var tot=1;
-    if(fz==="KILO"){if(cuarto)return "PRECIO X KG   $"+money(u*4);tot=kgDe(dsc)||1;return "PRECIO X KG   $"+money(u/tot)}
-    if(fz==="LITRO")tot=pnrLitros(dsc)||1;else if(fz==="METRO"){var mt=pnrMetro(dsc,u);tot=mt?mt.total:1}
-    else{var c=dsc.match(/(\d+)\s*(UNIDADES|UNID|UND|UN|U|ROLLOS?)\b/)||dsc.match(/(\d+)\s*X\s*\d/);tot=c?(+c[1]||1):1}
-    return "PRECIO X "+(fz==="UNIDAD"?"UN":fz)+"   $"+money(u/tot)}
-  if(cuarto)return "PRECIO X KG   $"+money(u*4);
-  if(suf==="KG"||suf==="KILO")return "PRECIO X KG   $"+money(u);
-  return ppumCalc(it.desc.replace(/GRANEL/ig,""),u,"","").ppum;
+  if(cuarto&&(!fz||fz==="KILO"))return "PRECIO X KG   $"+money(u*4);
+  if(!fz&&(suf==="KG"||suf==="KILO"))return "PRECIO X KG   $"+money(u);
+  var x=pnrPPUM(dsc,u,fz);return "PRECIO X "+({KILO:"KG",LITRO:"LITRO",UNIDAD:"UN",METRO:"METRO"}[x.u])+"   $"+money(x.v);
 }
 /* ---------- Excel ---------- */
 function findHeader(rows,keys){
