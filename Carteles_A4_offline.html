@@ -1,9 +1,7 @@
 <!doctype html>
 <html lang="es">
 <head>
-<meta charset="utf-8">
-<link rel="manifest" href="manifest.json"><meta name="theme-color" content="#e1251b"><link rel="icon" href="icon-192.png"><link rel="apple-touch-icon" href="icon-192.png">
-<script>if("serviceWorker" in navigator&&location.protocol==="https:"){addEventListener("load",function(){navigator.serviceWorker.register("sw.js")})}</script>
+<meta charset="utf-8"><link rel="manifest" href="manifest.json"><script>if("serviceWorker" in navigator)navigator.serviceWorker.register("sw.js");</script>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Carteles A4 · Santa Isabel</title>
 <style>
@@ -67,13 +65,13 @@ textarea{resize:vertical}
 .c .desc>.in{width:100%;text-align:center;font-weight:400;line-height:1.02;font-size:calc(var(--k)*var(--fs));text-transform:uppercase;overflow-wrap:normal}
 .c .precio>.in{display:flex;align-items:flex-start;white-space:nowrap;font-weight:900;line-height:.86}
 .c .precio .num{font-size:calc(var(--k)*var(--fs));letter-spacing:-.02em}
-.c .precio .sig{font-size:calc(var(--k)*var(--fs)*.4);margin-top:calc(var(--k)*var(--fs)*.11);margin-right:.08em}
+.c .precio .sig{font-size:calc(var(--k)*var(--fs)*.45);align-self:center;line-height:1;margin-right:.08em}
 .c .precio .cmb{font-size:calc(var(--k)*var(--fs)*.55);margin-top:calc(var(--k)*var(--fs)*.22);margin-right:.25em}
 .c .precio .suf{font-size:calc(var(--k)*var(--fs)*.2);align-self:flex-end;margin-left:.3em;margin-bottom:.1em;font-weight:700}
 .c .ppum>.in{display:flex;align-items:center;white-space:nowrap;color:#595959;font-weight:900}
 .c .ppum .lbl{font-weight:400;font-size:calc(var(--k)*var(--fs)*.35);line-height:1.05;text-align:center;white-space:normal;width:calc(var(--k)*var(--fs)*2.1);margin-right:.2em}
-.c .ppum .sig{font-size:calc(var(--k)*var(--fs)*.64);margin-right:.1em}
-.c .ppum .val{font-size:calc(var(--k)*var(--fs));line-height:1}
+.c .ppum .sig{font-size:calc(var(--k)*var(--fs)*.64);line-height:1;align-self:center;margin-right:.1em}
+.c .ppum .val{font-size:calc(var(--k)*var(--fs));line-height:1;align-self:center}
 .c .legal>.in{width:100%;text-align:center;font-size:calc(var(--k)*var(--fs));line-height:1.12;font-weight:400}
 .c .banda{position:absolute;left:0;right:0;background:#000;display:flex;align-items:center;gap:.6cm;padding:0 .5cm 0 .45cm}
 .c .banda img{height:3.1cm;width:auto;flex:none}
@@ -81,7 +79,7 @@ textarea{resize:vertical}
 .c .banda .txt b{display:block;font-size:30pt;font-weight:700}
 .c .fila>.in{display:flex;align-items:center;white-space:nowrap}
 .c .fila .grp{display:flex;align-items:flex-start;font-weight:900;line-height:.86}
-.c .fila .sig{font-size:calc(var(--k)*var(--fs)*.42);margin-top:calc(var(--k)*var(--fs)*.12);margin-right:.08em}
+.c .fila .sig{font-size:calc(var(--k)*var(--fs)*.45);align-self:center;line-height:1;margin-right:.08em}
 .c .fila .num{font-size:calc(var(--k)*var(--fs));letter-spacing:-.02em}
 .c .fila .cmb{font-size:calc(var(--k)*var(--fs)*.55);margin-top:calc(var(--k)*var(--fs)*.22);margin-right:.25em}
 .c .fila .lado{margin-left:.7cm;flex:none}
@@ -101,7 +99,7 @@ textarea{resize:vertical}
   *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
 }
 </style>
-</head>
+<style id="pnr-vig">.vig-row{display:flex;gap:10px}.vig-row label{flex:1;display:flex;flex-direction:column;gap:4px;font-size:13px;font-weight:700}.vig-row input{font:inherit;font-weight:400;padding:7px 8px;border:1px solid #ccc;border-radius:6px}.vig-hint{font-size:12px;color:#777;margin-top:6px}</style></head>
 <body>
 <div class="app">
   <div class="top">
@@ -141,8 +139,9 @@ textarea{resize:vertical}
       </div>
 
       <div class="panel">
-        <h2>Texto legal (pie de todos los carteles)</h2>
-        <textarea id="legal" rows="4"></textarea>
+        <h2>Vigencia de la promoción</h2>
+        <div class="vig-row"><label>Válido desde<input type="date" id="vDesde"></label><label>Válido hasta<input type="date" id="vHasta"></label></div>
+        <div class="vig-hint">Opcional. Si completas las fechas se agregan al pie de todos los carteles. La leyenda legal es estándar.</div>
       </div>
     </div>
 
@@ -187,7 +186,7 @@ var IMG_MINSAL = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAMMAAACoCAIAAADS
 var LEGAL_DEF = "OFERTA NO ACUMULABLE CON OTRAS PROMOCIONES.  DESCUENTO SE APLICA EN CAJAS. Máximo 15 promociones por RUT.  Ofertas en carnes rojas y blancas máximo 10 kilos por Rut. Se excluyen compras con factura.";
 var KEY = "cartelesA4_sinlocal_v1";
 
-var state = { legal: LEGAL_DEF, productos: [] };
+var state = { legal: LEGAL_DEF, desde:"", hasta:"", productos: [] };
 var uid = 0, abierto = null;
 function nid(){ uid++; return "a" + Date.now().toString(36) + uid; }
 function nuevo(v){
@@ -203,7 +202,7 @@ function normKey(k){ return String(k == null ? "" : k).normalize("NFD").replace(
 function pick(r){ for (var i = 1; i < arguments.length; i++){ var v = r[arguments[i]]; if (v !== undefined && v !== null && v !== "") return v; } return undefined; }
 var guardarT;
 function guardar(){ clearTimeout(guardarT); guardarT = setTimeout(function(){ try { localStorage.setItem(KEY, JSON.stringify(state)); } catch(e){} }, 300); }
-function cargar(){ try { var s = JSON.parse(localStorage.getItem(KEY) || "null"); if (s && Array.isArray(s.productos)){ state.legal = s.legal || LEGAL_DEF; state.productos = s.productos.map(nuevo); } } catch(e){} }
+function cargar(){ try { var s = JSON.parse(localStorage.getItem(KEY) || "null"); if (s && Array.isArray(s.productos)){ state.legal = LEGAL_DEF; state.desde = s.desde || ""; state.hasta = s.hasta || ""; state.productos = s.productos.map(nuevo); } } catch(e){} }
 
 var RE_ALCOHOL = /\b(CERVEZAS?|CERV|VINOS?|ESPUMANTES?|CHAMPAGNE|PISCOS?|RON|WHISKY|WHISKEY|VODKA|GIN|TEQUILA|LICOR(ES)?|SIDRA|COCTEL|COCKTAIL|AGUARDIENTE|BRANDY|COÑAC|COGNAC|JAGERMEISTER|FERNET|VERMOUTH|SAKE|MANZANILLA|ANIS|PAJARETE|HARD SELTZER)\b/;
 function esAlcohol(nombre, seccion){
@@ -305,7 +304,7 @@ function cartelHTML(p){
     h += zona("precio", L.precio, precioHTML(p));
     if (conPPUM) h += zona("ppum", L.ppum, ppumHTML(manual(p, ppumDe(p, p.precio))));
   }
-  h += zona("legal", L.legal, esc(state.legal));
+  h += zona("legal", L.legal, vigTxt() + esc(LEGAL_DEF));
   return '<div class="c">' + h + '</div>';
 }
 function manual(p, pu){
@@ -444,8 +443,16 @@ document.getElementById("btn-limpiar").addEventListener("click", function(){
   if (!state.productos.length || !confirm("¿Vaciar toda la lista de productos?")) return;
   state.productos = []; abierto = null; guardar(); renderLista(); renderPreview();
 });
-var legalEl = document.getElementById("legal");
-legalEl.addEventListener("input", function(){ state.legal = legalEl.value; guardar(); renderPreview(); });
+var vDesde = document.getElementById("vDesde"), vHasta = document.getElementById("vHasta");
+[vDesde, vHasta].forEach(function(el){ el.addEventListener("change", function(){ state.desde = vDesde.value; state.hasta = vHasta.value; guardar(); renderPreview(); }); });
+function fFecha(iso){ var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso || ""); return m ? m[3] + "/" + m[2] + "/" + m[1] : ""; }
+function vigTxt(){
+  var d = fFecha(state.desde), h = fFecha(state.hasta);
+  if (d && h) return "<b>VÁLIDO DESDE EL " + d + " AL " + h + " O HASTA AGOTAR STOCK.</b> ";
+  if (d) return "<b>VÁLIDO DESDE EL " + d + " O HASTA AGOTAR STOCK.</b> ";
+  if (h) return "<b>VÁLIDO HASTA EL " + h + " O HASTA AGOTAR STOCK.</b> ";
+  return "";
+}
 
 // ---------- importar Excel ----------
 var statusEl = document.getElementById("status");
@@ -573,7 +580,7 @@ document.getElementById("btn-print").addEventListener("click", function(){
 
 // ---------- inicio ----------
 cargar();
-legalEl.value = state.legal;
+vDesde.value = state.desde; vHasta.value = state.hasta;
 renderLista(); renderPreview();
 if (document.fonts && document.fonts.ready) document.fonts.ready.then(renderPreview);
 })();
@@ -687,7 +694,7 @@ aside .f label,aside label{font-size:11.5px}
 .pc-g3 input,.pc-g3 select{width:100%;box-sizing:border-box;min-width:0}
 </style>
 <script id="pnr-estandar-js">(function(){
-var C={"paneles": 1, "renombrar": [["^\\s*\\d\\.\\s*", ""], ["Elegir productos", "Carteles"], ["Texto legal.*", "Leyenda (pie de todos los carteles)"]], "orden": ["Cargar", "Leyenda", "CTA", "Carteles"]};
+var C={"paneles": 1, "renombrar": [["^\\s*\\d\\.\\s*", ""], ["Elegir productos", "Carteles"], ["Texto legal.*", "Leyenda (pie de todos los carteles)"]], "orden": ["Cargar", "Vigencia", "CTA", "Carteles"]};
 var P=document.querySelector("aside")||document.querySelector(".app>.grid>div:first-child,.app>.workspace>div:first-child");if(!P)return;
 function txt(e){var h=e.tagName==="H2"?e:e.querySelector&&e.querySelector("h2");return h?h.textContent:""}
 // títulos estándar

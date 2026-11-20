@@ -1,6 +1,11 @@
-<!doctype html><html><head><meta charset="utf-8">
-<link rel="manifest" href="manifest.json"><meta name="theme-color" content="#e1251b"><link rel="icon" href="icon-192.png"><link rel="apple-touch-icon" href="icon-192.png">
-<script>if("serviceWorker" in navigator&&location.protocol==="https:"){addEventListener("load",function(){navigator.serviceWorker.register("sw.js")})}</script><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#faf9f5;color:#141413}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<!doctype html><html><head><meta charset="utf-8"><link rel="manifest" href="manifest.json"><script>if("serviceWorker" in navigator)navigator.serviceWorker.register("sw.js");</script><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#faf9f5;color:#141413}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style><style id="pnr-guias">
+.hoja{position:relative}
+.hoja .guia{position:absolute;pointer-events:none;z-index:5}
+.hoja .corte-v{left:396.35px;top:0;bottom:0;width:0;border-left:1px dashed #888}
+.hoja .corte-h{top:560.76px;left:0;right:0;height:0;border-top:1px dashed #888}
+.hoja .doblez{left:0;right:0;height:0;border-top:1px dashed #9a9a9a}
+.hoja .guia-txt{position:absolute;left:4px;z-index:5;font:600 8px/1 Arial,sans-serif;color:#999;pointer-events:none}
+</style></head><body>
 <title>Ofertas · Confección de carteles</title>
 <style>
   :root{
@@ -494,6 +499,9 @@
         </div>
         <label class="check-row" style="display:flex;gap:8px;align-items:center;font-size:13px;margin:0 0 10px;cursor:pointer">
           <input type="checkbox" id="imp-excl" checked> Encabezado "OFERTA EXCLUSIVA · LOCAL"
+        </label>
+        <label class="check-row" style="display:flex;gap:8px;align-items:center;font-size:13px;margin:0 0 10px;cursor:pointer">
+          <input type="checkbox" id="imp-guias"> Líneas de corte y doblez (2 cm superiores)
         </label>
         <div class="drop" id="imp-drop">
           <b>Subir Excel de carga de precios o catálogo</b>
@@ -1189,6 +1197,15 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
     return flat;
   }
 
+  function guiasHTML(){
+    var g = document.getElementById("imp-guias");
+    if (!g || !g.checked) return "";
+    return '<div class="guia corte-v"></div><div class="guia corte-h"></div>' +
+      '<div class="guia doblez" style="top:75.6px"></div><div class="guia doblez" style="top:636.85px"></div>' +
+      '<span class="guia-txt" style="top:563px">✂ corte</span>' +
+      '<span class="guia-txt" style="top:63px">doblez</span><span class="guia-txt" style="top:624px">doblez</span>';
+  }
+
   function renderPreview(){
     var flat = buildFlatCards();
     var hojasEl = document.getElementById("hojas");
@@ -1214,7 +1231,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
       }
       return (
         '<div>' +
-          '<div class="hoja-wrap"><div class="hoja" data-page="' + idx + '">' + cells + placeholders + '</div></div>' +
+          '<div class="hoja-wrap"><div class="hoja" data-page="' + idx + '">' + cells + placeholders + guiasHTML() + '</div></div>' +
           '<div class="hoja-label">Hoja ' + (idx + 1) + ' de ' + pages.length + '</div>' +
         '</div>'
       );
@@ -1362,6 +1379,11 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
   }
 
   var KEY_NOMBRE = "cartel_nombre_local", KEY_EXCL = "cartel_exclusiva";
+  (function(){
+    var g = document.getElementById("imp-guias");
+    try { g.checked = localStorage.getItem("cartel_guias") === "1"; } catch(e){}
+    g.addEventListener("change", function(){ try { localStorage.setItem("cartel_guias", g.checked ? "1" : "0"); } catch(e){} renderPreview(); });
+  })();
   function encabezadoHTML(){
     var ex = document.getElementById("imp-excl");
     if (!ex || !ex.checked) return "";
